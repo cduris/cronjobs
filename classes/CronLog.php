@@ -35,6 +35,8 @@ class CronLog extends ObjectModel
 
 	const CRON_EXECUTE_POK = 200;
 
+    const DOMAIN_ADD_POK = 300;
+
 	/**
      * Logging levels from syslog protocol defined in RFC 5424
      *
@@ -44,6 +46,7 @@ class CronLog extends ObjectModel
         self::CRON_ADD_POK		=> 'CRON_ADD_POK',
         self::CRON_EXECUTE_OK   => 'CRON_EXECUTE_OK',
         self::CRON_EXECUTE_POK  => 'CRON_EXECUTE_POK',
+        self::DOMAIN_ADD_POK      => 'DOMAIN_ADD_POK'
     );
 
     public function __construct()
@@ -58,14 +61,14 @@ class CronLog extends ObjectModel
      * @param  string  $message The log message
      * @return Boolean Whether the record has been processed
      */
-	private static function addRecord($level, $id_cron, $message = null)
+	private static function addRecord($level, $id_cron = null, $message = null)
 	{
 		return Db::getInstance()->insert('cronjobs_log', array('id' => 'NULL', 'id_cron' => $id_cron, 'level' => $level, 'message' => $message, 'date_add' => date('Y-m-d H:i:s')));
 	}
 
-	public static function cronAddPok($id_cron, $message = null)
+	public static function cronAddPok($message = null)
 	{
-		return static::addRecord(static::CRON_ADD_POK, $id_cron, $message);
+		return static::addRecord(static::CRON_ADD_POK, null, $message);
 	}
 
 	public static function cronExecuteOk($id_cron, $message = null)
@@ -74,9 +77,14 @@ class CronLog extends ObjectModel
 	}
 
 	public static function cronExecutePok($id_cron, $message = null)
-	{
-		return static::addRecord(static::CRON_EXECUTE_POK, $id_cron, $message);
-	}
+    {
+        return static::addRecord(static::CRON_EXECUTE_POK, $id_cron, $message);
+    }
+
+    public static function domainAddPok($message = null)
+    {
+        return static::addRecord(static::DOMAIN_ADD_POK, null, $message);
+    }
 
     /**
      * Gets the name of the logging level.
