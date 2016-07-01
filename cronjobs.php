@@ -31,6 +31,8 @@ if (defined('_PS_ADMIN_DIR_') === false)
 	define('_PS_ADMIN_DIR_', _PS_ROOT_DIR_.'/admin/');
 
 require_once(dirname(__FILE__).'/classes/CronJobsForms.php');
+require_once(dirname(__FILE__).'/classes/CronLog.php');
+require_once(dirname(__FILE__).'/classes/CronApi.php');
 
 class CronJobs extends Module
 {
@@ -76,7 +78,7 @@ class CronJobs extends Module
 		return $this->registerDomain() && $return &&parent::install();
 	}
 
-	private static function call($url, $type, $params = array())
+	private function call($url, $type, $params = array())
 	{
 		$datas['method'] = $type;
 
@@ -176,13 +178,7 @@ class CronJobs extends Module
 	// Register the domain and return a token
 	private function registerDomain()
 	{
-		$token = $this->call('http://devmodule.prestashop.net/cduris/cronjobs2/public/domain', 'POST', array('domain_name' => _PS_BASE_URL_.__PS_BASE_URI__));
-
-		if($token != '-1' && $token != '-2') {
-			return Configuration::updateValue('CRONJOBS_TOKEN', $token);
-		}
-
-		return false;
+		CronApi::registerDomain();
 	}
 
 	public function getContent()
@@ -506,28 +502,7 @@ class CronJobs extends Module
 
 	public function addNewModulesTasks()
 	{
-		$data = array(
-			'domain_name' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__,
-			'url' => Tools::getValue('task'),
-			'hour' => Tools::getValue('hour'),
-			'minute' => Tools::getValue('minute'),
-    		'day_of_month' => Tools::getValue('day'),
-    		'day_of_week' => Tools::getValue('day_of_week'),
-    		'one_shot' => false,
-    		'params' => Tools::getValue('params'),
-			'token' => Configuration::getGlobalValue('CRONJOBS_TOKEN')
-		);
-
-		$context_options = array('http' => array(
-			'method' => 'POST',
-			'header'  => 'Content-type: application/x-www-form-urlencoded',
-			'content' => http_build_query($data)
-		));
-
-		$result = Tools::file_get_contents($this->webservice_url.'cron', false, stream_context_create($context_options));
-
-		// TODO
-		// Gérer les erreurs en fonction du retour de l'API
+		CronApi::registerCron('cartab', 'send', 'params', -1, 0, -1, -1);
 	}
 
 	public function addNewModulesTasks_old()
