@@ -23,6 +23,11 @@
 *  International Registered Trademark & Property of PrestaShop SA
 *}
 
+<div class="alert alert-danger">
+	{l s='We are migrating our cron task service to a newer version.'}<br>
+	{l s='Please migrate all your cron task ...'}
+</div>
+
 <div class="panel">
 	<h3>{l s='What does this module do?' mod='cronjobs'}</h3>
 	<p>

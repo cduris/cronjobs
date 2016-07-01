@@ -81,6 +81,12 @@ class CronJobsForms
 					'name' => 'task',
 					'label' => self::$module->l('Target link', 'CronJobsForms'),
 				);
+
+				$form[0]['form']['input'][] = array(
+					'type' => 'text',
+					'name' => 'params',
+					'label' => self::$module->l('Parameters', 'CronJobsForms'),
+				);
 			}
 			else
 			{
@@ -99,17 +105,23 @@ class CronJobsForms
 					'desc' => self::$module->l('Set the link of your cron task.', 'CronJobsForms'),
 					'placeholder' => $currencies_cron_url,
 				);
+
+				$form[0]['form']['input'][] = array(
+					'type' => 'text',
+					'name' => 'params',
+					'label' => self::$module->l('Parameters', 'CronJobsForms'),
+				);
 			}
 		}
 		else
 		{
-			$form[0]['form']['input'][] = array(
-				'type' => 'text',
-				'name' => 'description',
-				'label' => self::$module->l('Task description', 'CronJobsForms'),
-				'desc' => self::$module->l('Enter a description for this task.', 'CronJobsForms'),
-				'placeholder' => self::$module->l('Update my currencies', 'CronJobsForms'),
-			);
+			// $form[0]['form']['input'][] = array(
+			// 	'type' => 'text',
+			// 	'name' => 'description',
+			// 	'label' => self::$module->l('Task description', 'CronJobsForms'),
+			// 	'desc' => self::$module->l('Enter a description for this task.', 'CronJobsForms'),
+			// 	'placeholder' => self::$module->l('Update my currencies', 'CronJobsForms'),
+			// );
 
 			$form[0]['form']['input'][] = array(
 				'type' => 'text',
@@ -117,6 +129,12 @@ class CronJobsForms
 				'label' => self::$module->l('Target link', 'CronJobsForms'),
 				'desc' => self::$module->l('Do not forget to use an absolute URL to make it valid! The link also has to be on the same domain as the shop.', 'CronJobsForms'),
 				'placeholder' => $currencies_cron_url,
+			);
+
+			$form[0]['form']['input'][] = array(
+				'type' => 'text',
+				'name' => 'params',
+				'label' => self::$module->l('Parameters', 'CronJobsForms'),
 			);
 		}
 
@@ -130,6 +148,18 @@ class CronJobsForms
 				'id' => 'id', 'name' => 'name'
 			),
 		);
+
+		$form[0]['form']['input'][] = array(
+			'type' => 'select',
+			'name' => 'minute',
+			'label' => self::$module->l('Minutes', 'CronJobsForms'),
+			'desc' => self::$module->l('At what time should this task be executed?', 'CronJobsForms'),
+			'options' => array(
+				'query' => self::getMinutesFormOptions(),
+				'id' => 'id', 'name' => 'name'
+			),
+		);
+
 		$form[0]['form']['input'][] = array(
 			'type' => 'select',
 			'name' => 'day',
@@ -139,15 +169,16 @@ class CronJobsForms
 				'id' => 'id', 'name' => 'name'
 			),
 		);
-		$form[0]['form']['input'][] = array(
-			'type' => 'select',
-			'name' => 'month',
-			'desc' => self::$module->l('On what month should this task be executed?', 'CronJobsForms'),
-			'options' => array(
-				'query' => self::getMonthsFormOptions(),
-				'id' => 'id', 'name' => 'name'
-			),
-		);
+		// $form[0]['form']['input'][] = array(
+		// 	'type' => 'select',
+		// 	'name' => 'month',
+		// 	'desc' => self::$module->l('On what month should this task be executed?', 'CronJobsForms'),
+		// 	'options' => array(
+		// 		'query' => self::getMonthsFormOptions(),
+		// 		'id' => 'id', 'name' => 'name'
+		// 	),
+		// );
+
 		$form[0]['form']['input'][] = array(
 			'type' => 'select',
 			'name' => 'day_of_week',
@@ -239,6 +270,8 @@ class CronJobsForms
 			'task' => Tools::safeOutput(Tools::getValue('task', null)),
 			'hour' => (int)Tools::getValue('hour', -1),
 			'day' => (int)Tools::getValue('day', -1),
+			'params' => (int)Tools::getValue('params', null),
+			'minute' => (int)Tools::getValue('minute', 0),
 			'month' => (int)Tools::getValue('month', -1),
 			'day_of_week' => (int)Tools::getValue('day_of_week', -1),
 		);
@@ -318,6 +351,11 @@ class CronJobsForms
 		return $crons;
 	}
 
+	protected static function getMinutesFormOptions()
+	{
+		return array(array('id' => 0, 'name' => 0), array('id' => 30, 'name' => 30));
+	}
+
 	protected static function getHoursFormOptions()
 	{
 		$data = array(array('id' => '-1', 'name' => self::$module->l('Every hour', 'CronJobsForms')));
@@ -330,7 +368,7 @@ class CronJobsForms
 
 	protected static function getDaysFormOptions()
 	{
-		$data = array(array('id' => '-1', 'name' => self::$module->l('Every day of the month', 'CronJobsForms')));
+		$data = array(array('id' => '-1', 'name' => self::$module->l('Every day', 'CronJobsForms')));
 
 		for ($day = 1; $day <= 31; $day += 1)
 			$data[] = array('id' => $day, 'name' => $day);

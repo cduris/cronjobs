@@ -39,13 +39,13 @@ class CronJobs extends Module
 	protected $_successes;
 	protected $_warnings;
 
-	public $webservice_url = 'http://webcron.prestashop.com/crons';
+	public $webservice_url = 'http://devmodule.prestashop.net/cduris/cronjobs2/public/';
 
 	public function __construct()
 	{
 		$this->name = 'cronjobs';
 		$this->tab = 'administration';
-		$this->version = '1.3.3';
+		$this->version = '2.0.0';
 		$this->module_key = '';
 
 		$this->controllers = array('callback');
@@ -70,25 +70,34 @@ class CronJobs extends Module
 
 	public function install()
 	{
-		Configuration::updateValue('CRONJOBS_ADMIN_DIR', Tools::encrypt($this->getAdminDir()));
-		Configuration::updateValue('CRONJOBS_MODE', 'webservice');
-		Configuration::updateValue('CRONJOBS_MODULE_VERSION', $this->version);
-		Configuration::updateValue('CRONJOBS_WEBSERVICE_ID', 0);
+		include(dirname(__FILE__).'/sql/install.php');
 
-		$token = Tools::encrypt(Tools::getShopDomainSsl().time());
-		Configuration::updateGlobalValue('CRONJOBS_EXECUTION_TOKEN', $token);
+		// Call API to register domain
+		return $this->registerDomain() && $return &&parent::install();
+	}
 
-		if (parent::install())
-		{
-			$this->updateWebservice(true);
+	private static function call($url, $type, $params = array())
+	{
+		$datas['method'] = $type;
 
-			return $this->installDb() && $this->installTab() &&
-				$this->registerHook('actionModuleRegisterHookAfter') &&
-				$this->registerHook('actionModuleUnRegisterHookAfter') &&
-				$this->registerHook('backOfficeHeader');
+		switch ($type) {
+			case 'POST':
+			case 'PUT':
+			case 'PATCH':
+				$datas['header'] = 'Content-type: application/x-www-form-urlencoded';
+				$datas['content'] = http_build_query($params);
+			break;
+			case 'GET':
+			case 'DELETE':
+				$url .= '?'.http_build_query($params);
+			break;
 		}
 
-		return false;
+		$opts = array('http' => $datas);
+
+		$context  = stream_context_create($opts);
+
+		return Tools::file_get_contents($url, false, $context);
 	}
 
 	protected function getAdminDir()
@@ -122,66 +131,7 @@ class CronJobs extends Module
 
 		$this->disableWebservice();
 
-		return	$this->uninstallDb() &&
-			$this->uninstallTab() &&
-			parent::uninstall();
-	}
-
-	public function installDb()
-	{
-		return Db::getInstance()->execute('
-			CREATE TABLE IF NOT EXISTS '._DB_PREFIX_.$this->name.' (
-			`id_cronjob` INTEGER(10) NOT NULL AUTO_INCREMENT,
-			`id_module` INTEGER(10) DEFAULT NULL,
-			`description` TEXT DEFAULT NULL,
-			`task` TEXT DEFAULT NULL,
-			`hour` INTEGER DEFAULT \'-1\',
-			`day` INTEGER DEFAULT \'-1\',
-			`month` INTEGER DEFAULT \'-1\',
-			`day_of_week` INTEGER DEFAULT \'-1\',
-			`updated_at` DATETIME DEFAULT NULL,
-			`one_shot` BOOLEAN NOT NULL DEFAULT 0,
-			`active` BOOLEAN DEFAULT FALSE,
-			`id_shop` INTEGER DEFAULT \'0\',
-			`id_shop_group` INTEGER DEFAULT \'0\',
-			PRIMARY KEY(`id_cronjob`),
-			INDEX (`id_module`))
-			ENGINE='._MYSQL_ENGINE_.' default CHARSET=utf8'
-		);
-	}
-
-	public function uninstallDb()
-	{
-		return Db::getInstance()->execute('DROP TABLE IF EXISTS '._DB_PREFIX_.$this->name);
-	}
-
-	public function installTab()
-	{
-		$tab = new Tab();
-		$tab->active = 1;
-		$tab->name = array();
-		$tab->class_name = 'AdminCronJobs';
-
-		foreach (Language::getLanguages(true) as $lang)
-			$tab->name[$lang['id_lang']] = 'Cron Jobs';
-
-		$tab->id_parent = -1;
-		$tab->module = $this->name;
-
-		return $tab->add();
-	}
-
-	public function uninstallTab()
-	{
-		$id_tab = (int)Tab::getIdFromClassName('AdminCronJobs');
-
-		if ($id_tab)
-		{
-			$tab = new Tab($id_tab);
-			return $tab->delete();
-		}
-
-		return false;
+		return parent::uninstall();
 	}
 
 	public function hookActionModuleRegisterHookAfter($params)
@@ -222,8 +172,28 @@ class CronJobs extends Module
 		}
 	}
 
+	// API V2
+	// Register the domain and return a token
+	private function registerDomain()
+	{
+		$token = $this->call('http://devmodule.prestashop.net/cduris/cronjobs2/public/domain', 'POST', array('domain_name' => _PS_BASE_URL_.__PS_BASE_URI__));
+
+		if($token != '-1' && $token != '-2') {
+			return Configuration::updateValue('CRONJOBS_TOKEN', $token);
+		}
+
+		return false;
+	}
+
 	public function getContent()
 	{
+		$_POST['token'] = 'fdf2c208c5bbcb2b8058af2133de21b3';
+		$_POST['module_name'] = 'cartabandonmentpro';
+		$_POST['action'] = 'send';
+		$_POST['id_cron'] = 3;
+
+		require dirname(__FILE__).'/cron.php';
+
 		$output = null;
 		CronJobsForms::init($this);
 		$this->checkLocalEnvironment();
@@ -430,7 +400,21 @@ class CronJobs extends Module
 		$helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false)
 			.'&configure='.$this->name.'&tab_module='.$this->tab.'&module_name='.$this->name;
 
-		return $helper->generateList($values, CronJobsForms::getTasksList());
+		$this->context->smarty->assign('tasks', $this->getTaskList());
+
+		return $this->display(__FILE__, 'views/templates/admin/tasks.tpl').$helper->generateList($values, CronJobsForms::getTasksList());
+	}
+
+	// API V2
+	// Get all tasks list for the domain
+	private function getTaskList()
+	{
+		$context_options = array('http' => array(
+			'method' => 'GET',
+			'header'  => 'Content-type: application/x-www-form-urlencoded'
+		));
+
+		return Tools::jsonDecode(Tools::file_get_contents($this->webservice_url.'crons?domain_name='.Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'&token='.Configuration::getGlobalValue('CRONJOBS_TOKEN'), false, stream_context_create($context_options)));
 	}
 
 	protected function postProcessConfiguration()
@@ -508,7 +492,45 @@ class CronJobs extends Module
 		return $this->setErrorMessage('The task has not been updated');
 	}
 
+	public function addCronTask($url, $params, $hour, $minute, $day, $day_of_week, $one_shot = false)
+	{
+		$_POST['url'] = $url;
+		$_POST['params'] = $params;
+		$_POST['hour'] = $hour;
+		$_POST['minute'] = $minute;
+		$_POST['day'] = $day;
+		$_POST['day_of_week'] = $day_of_week;
+
+		$this->addNewModulesTasks();
+	}
+
 	public function addNewModulesTasks()
+	{
+		$data = array(
+			'domain_name' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__,
+			'url' => Tools::getValue('task'),
+			'hour' => Tools::getValue('hour'),
+			'minute' => Tools::getValue('minute'),
+    		'day_of_month' => Tools::getValue('day'),
+    		'day_of_week' => Tools::getValue('day_of_week'),
+    		'one_shot' => false,
+    		'params' => Tools::getValue('params'),
+			'token' => Configuration::getGlobalValue('CRONJOBS_TOKEN')
+		);
+
+		$context_options = array('http' => array(
+			'method' => 'POST',
+			'header'  => 'Content-type: application/x-www-form-urlencoded',
+			'content' => http_build_query($data)
+		));
+
+		$result = Tools::file_get_contents($this->webservice_url.'cron', false, stream_context_create($context_options));
+
+		// TODO
+		// Gérer les erreurs en fonction du retour de l'API
+	}
+
+	public function addNewModulesTasks_old()
 	{
 		$crons = Hook::getHookModuleExecList('actionCronJob');
 
